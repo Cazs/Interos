@@ -22,6 +22,7 @@ import java.net.DatagramSocket;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.lang.NumberFormatException;
 
 public class Master extends JFrame implements KeyListener
 {
@@ -29,11 +30,11 @@ public class Master extends JFrame implements KeyListener
 	private static final int SCR_H=80;
 	private ArrayList<Client> clients;
 	private DatagramSocket server;
-	private final int SVR_PORT = 4242;
-	private final int CLIENT_PORT=4440;
+	private static int svr_port = 4242;
+	//private int client_port = 4440;
 	private boolean server_is_running = true;
 	private final int BUFFER_SIZE = 512;
-	private String master_name="Superuser";
+	private static String master_name="Superuser";
 	private boolean verbose = true;
 	private Client selected_client;
 	private JComboBox<Client> cbx_clients;
@@ -51,7 +52,7 @@ public class Master extends JFrame implements KeyListener
 		//setup socket
 		try
 		{
-			server = new DatagramSocket(SVR_PORT);
+			server = new DatagramSocket(svr_port);
 		}catch(SocketException e)
 		{
 			System.err.println(e.getMessage());
@@ -81,10 +82,10 @@ public class Master extends JFrame implements KeyListener
 		tListener.start();
 	}
 
-	public void sendDatagram(String message, String ip) throws IOException
+	public void sendDatagram(String message, String ip, int port) throws IOException
 	{
 		InetAddress dest_ip = InetAddress.getByName(ip);
-		DatagramPacket outbound = new DatagramPacket(message.getBytes(),message.getBytes().length,dest_ip,CLIENT_PORT);
+		DatagramPacket outbound = new DatagramPacket(message.getBytes(), message.getBytes().length, dest_ip, port);
 		server.send(outbound);
 	}
 
@@ -118,15 +119,34 @@ public class Master extends JFrame implements KeyListener
 					//get rid of the first slash if it exists
 					if(client_ip.charAt(0)=='/' || client_ip.charAt(0)=='\\')
 						client_ip = client_ip.substring(1);
-					System.out.println(String.format("%s @%s:%s says HELLO.",client_name,
-																						client_ip,inbound_packet.getPort()));
-					Client new_client = new Client(client_name, client_ip, inbound_packet.getPort());
-					clients.add(new_client);
+					System.out.println(String.format("%s @%s:%s says HELLO.",client_name,client_ip,inbound_packet.getPort()));
+					//search client list for new client IP address
+					boolean found=false;
+					for(Client c:clients)
+					{
+						if(c.getIP().equals(client_ip))//client is   already  on the list
+						{
+							found=true;
+							//update the client name and port
+							System.out.println(String.format("Updating client [%s @%s:%s] >>> [%s @%s:%s]",
+																c.getName(),c.getIP(),c.getPort(), client_name, client_ip,inbound_packet.getPort()));
+							c.setName(client_name);
+							c.setPort(inbound_packet.getPort());
+							break;
+						}
+					}
 
-					cbx_clients.addItem(new_client);
+					if(!found)
+					{
+						//add to list if is new client
+						Client new_client = new Client(client_name, client_ip, inbound_packet.getPort());
+						clients.add(new_client);
 
-					System.out.println("Added new client: " + client_name);
-					sendDatagram("ACK HELLO " + master_name,client_ip);
+						cbx_clients.addItem(new_client);
+
+						System.out.println("Added new client: " + client_name);
+					}
+					sendDatagram("ACK HELLO " + master_name,client_ip, inbound_packet.getPort());
 					break;
 				default:
 					System.err.println("Unknown command: " + cmd);
@@ -222,7 +242,7 @@ public class Master extends JFrame implements KeyListener
 			return;
 		}
 
-		sendDatagram("KEYPRESS " + e.getKeyCode(),selected_client.getIP());
+		sendDatagram("KEYPRESS " + e.getKeyCode(),selected_client.getIP(), selected_client.getPort());
 	}
 
 	public void handleKeyRelease(KeyEvent e) throws IOException
@@ -234,7 +254,7 @@ public class Master extends JFrame implements KeyListener
 			return;
 		}
 
-		sendDatagram("KEYRELEASE " + e.getKeyCode(),selected_client.getIP());
+		sendDatagram("KEYRELEASE " + e.getKeyCode(),selected_client.getIP(), selected_client.getPort());
 	}
 
 	public void handleKeyTyped(KeyEvent e) throws IOException
@@ -246,12 +266,24 @@ public class Master extends JFrame implements KeyListener
 			return;
 		}
 
-		sendDatagram("KEYTYPE " + e.getKeyCode(),selected_client.getIP());
+		sendDatagram("KEYTYPE " + e.getKeyCode(),selected_client.getIP(), selected_client.getPort());
 	}
 
 	public static void main(String[] args)
 	{
-		new Master().setVisible(true);
+		//<server name> <server port>
+		if(args.length>=2)
+		{
+			master_name = args[0];
+			try
+			{
+				svr_port = Integer.valueOf(args[1]);
+				new Master().setVisible(true);
+			}catch(NumberFormatException e)
+			{
+				System.err.println(e.getMessage());
+			}
+		}else System.err.println("Not enough actual arguments.");
 	}
 
 }
