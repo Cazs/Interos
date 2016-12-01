@@ -18,6 +18,7 @@ public class Slave
 	private final int SVR_PORT = 4242;
 	private boolean server_is_running = true;
 	private final int BUFFER_SIZE = 512;
+	private Timer tMasterFinder;
 
 	public Slave()
 	{
@@ -31,7 +32,7 @@ public class Slave
 			System.exit(-1);
 		}
 		//Look for masters
-		Timer tMasterFinder = new Timer();
+		tMasterFinder = new Timer();
 		tMasterFinder.scheduleAtFixedRate(new TimerTask()
 		{
 			@Override
@@ -84,7 +85,7 @@ public class Slave
 		}
 	}
 
-	private boolean handleInboundMessage(DatagramPacket inbound_packet)
+	private boolean handleInboundMessage(DatagramPacket inbound_packet) throws IOException
 	{
 		String msg = new String(inbound_packet.getData(),0,inbound_packet.getLength());
 		if(msg==null)return false;
@@ -101,12 +102,13 @@ public class Slave
 					{
 						master_name = command_params[2];
 						master_ip = inbound_packet.getAddress().toString();
-						System.out.println(String.format("Connected to %s @%s:%i.",master_name,
-																							inbound_packet.getAddress().toString(),inbound_packet.getPort()));
-
+						//get rid of the first slash if it exists
+						if(master_ip.charAt(0)=='/' || master_ip.charAt(0)=='\\')
+							master_ip = master_ip.substring(1);
+						System.out.println(String.format("Connected to %s @%s:%s.",master_name,master_ip,inbound_packet.getPort()));
 
 						is_connected=true;
-
+						tMasterFinder.cancel();//stop the Timer that looks for masters
 					}
 					break;
 				default:
