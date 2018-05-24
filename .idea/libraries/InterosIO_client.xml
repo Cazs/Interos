@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="InterosIO_client">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/bin/InterosIO_client.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

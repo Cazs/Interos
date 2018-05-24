@@ -1,14 +1,19 @@
-import java.awt.AWTException;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import javax.swing.BoxLayout;
-import java.awt.Robot;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseEvent;
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.PointerInfo;
+import java.awt.event.FocusListener;
+import java.awt.event.FocusEvent;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
@@ -23,8 +28,9 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.lang.NumberFormatException;
+import java.lang.InterruptedException;
 
-public class Master extends JFrame implements KeyListener
+public class Master extends JFrame implements KeyListener, MouseMotionListener, FocusListener
 {
 	private static final int SCR_W=120;
 	private static final int SCR_H=80;
@@ -38,6 +44,7 @@ public class Master extends JFrame implements KeyListener
 	private boolean verbose = true;
 	private Client selected_client;
 	private JComboBox<Client> cbx_clients;
+	private boolean is_focused = true;
 
 	public Master()
 	{
@@ -47,7 +54,8 @@ public class Master extends JFrame implements KeyListener
 		this.setBounds(0,0,SCR_W,SCR_H);
 		this.setLayout(new GridBagLayout());
 		this.setBackground(Color.BLACK);
-
+		//set mouse listener
+		//this.addMouseMotionListener(this);
 		clients = new ArrayList<Client>();
 		//setup socket
 		try
@@ -177,7 +185,34 @@ public class Master extends JFrame implements KeyListener
 	private void initHandlers()
 	{
 		this.addKeyListener(this);
+		this.addFocusListener(this);
 		cbx_clients.addKeyListener(this);
+		cbx_clients.addFocusListener(this);
+
+		Thread tMouseListener = new Thread(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				while(true)
+				{
+					if(is_focused)
+					{
+						System.out.println("x:"+MouseInfo.getPointerInfo().getLocation().x);
+						System.out.println("y:"+MouseInfo.getPointerInfo().getLocation().y);
+					}
+					try
+					{
+						Thread.sleep(500);
+					}catch(InterruptedException e)
+					{
+						System.err.println(e.getMessage());
+					}
+				}
+			}
+		});
+		tMouseListener.start();
+
 		cbx_clients.addItemListener(new ItemListener()
 		{
 			@Override
@@ -232,6 +267,32 @@ public class Master extends JFrame implements KeyListener
 			System.exit(-1);
 		}
 	}
+
+	@Override
+	public void mouseMoved(MouseEvent event)
+	{
+		System.out.println(String.format("Mouse pos: [%s,%s]",event.getXOnScreen(),event.getYOnScreen()));
+	}
+
+	@Override
+	public void mouseDragged(MouseEvent event)
+	{
+
+	}
+
+	@Override
+  public void focusGained(FocusEvent event)
+	{
+      System.out.println("Focus gained.");
+			is_focused = true;
+  }
+
+  @Override
+  public void focusLost(FocusEvent event)
+	{
+      System.out.println("Focus lost.");
+			is_focused = false;
+  }
 
 	public void handleKeyPress(KeyEvent e) throws IOException
 	{

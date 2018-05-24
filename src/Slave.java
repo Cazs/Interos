@@ -6,6 +6,9 @@ import java.util.TimerTask;
 import java.io.IOException;
 import java.net.SocketException;
 import java.lang.NumberFormatException;
+import java.awt.Robot;
+import java.awt.AWTException;
+
 
 public class Slave
 {
@@ -22,13 +25,21 @@ public class Slave
 	private final int BUFFER_SIZE = 512;
 	private Timer tMasterFinder;
 
+	private Robot io_controller;
+
 	public Slave()
 	{
-		//setup socket
 		try
 		{
+			//init Robot
+			io_controller = new Robot();
+			//setup socket
 			socket = new DatagramSocket(client_port);
 		}catch(SocketException e)
+		{
+			System.err.println(e.getMessage());
+			System.exit(-1);
+		}catch(AWTException e)
 		{
 			System.err.println(e.getMessage());
 			System.exit(-1);
@@ -40,13 +51,19 @@ public class Slave
 			@Override
 			public void run()
 			{
-				//send request for masters
-				try
+				if(!is_connected)
 				{
-					sendDatagram("HELLO " + client_name,master_ip);
-				}catch(IOException e)
+					//send request for masters
+					try
+					{
+						sendDatagram("HELLO " + client_name,master_ip);
+					}catch(IOException e)
+					{
+						System.err.println(e.getMessage());
+					}
+				}else
 				{
-					System.err.println(e.getMessage());
+					//ping server so it (and I) know we are still connected.
 				}
 			}
 		},0,MASTER_SEARCH_INTERVAL);
@@ -102,13 +119,13 @@ public class Slave
 					handleACK(command_params, inbound_packet);
 					break;
 				case "KEYPRESS":
-					handleKeyPress(command_params, inbound_packet);
+					handleKeyPress(command_params);
 					break;
 				case "KEYRELEASE":
-					handleKeyRelease(command_params, inbound_packet);
+					handleKeyRelease(command_params);
 					break;
 				case "KEYTYPE":
-					handleKeyType(command_params, inbound_packet);
+					handleKeyType(command_params);
 					break;
 				default:
 					System.err.println("Unknown command: " + cmd);
@@ -127,26 +144,40 @@ public class Slave
 			//get rid of the first slash if it exists
 			if(master_ip.charAt(0)=='/' || master_ip.charAt(0)=='\\')
 				master_ip = master_ip.substring(1);
-			System.out.println(String.format("Connected to %s @%s:%s.",master_name,master_ip,inbound_packet.getPort()));
+			System.out.println(String.format("Connected to master %s @%s:%s.",master_name,master_ip,inbound_packet.getPort()));
 
 			is_connected=true;
-			tMasterFinder.cancel();//stop the Timer that looks for masters
+			//tMasterFinder.cancel();//stop the Timer that looks for masters
 		}
 	}
 
-	public void handleKeyPress(String[] command_params, DatagramPacket inbound_packet)
+	public void handleKeyPress(String[] command_params) throws NumberFormatException
 	{
-
+		if(command_params.length>1)
+		{
+			int key_code = Integer.valueOf(command_params[1]);
+			System.out.println("Pressing key: " + key_code);
+			io_controller.keyPress(key_code);
+		}
 	}
 
-	public void handleKeyRelease(String[] command_params, DatagramPacket inbound_packet)
+	public void handleKeyRelease(String[] command_params) throws NumberFormatException
 	{
-
+		if(command_params.length>1)
+		{
+			int key_code = Integer.valueOf(command_params[1]);
+			System.out.println("Releasing key: " + key_code);
+			io_controller.keyRelease(key_code);
+		}
 	}
 
-	public void handleKeyType(String[] command_params, DatagramPacket inbound_packet)
+	public void handleKeyType(String[] command_params) throws NumberFormatException
 	{
-
+		if(command_params.length>1)
+		{
+			int key_code = Integer.valueOf(command_params[1]);
+			//TODO: make a key type event
+		}
 	}
 
 	public static void main(String[] args)
@@ -160,7 +191,7 @@ public class Slave
 				master_ip = args[1];
 				svr_port = Integer.valueOf(args[2]);
 				client_port = Integer.valueOf(args[3]);
-				new Slave();
+				new Slave();//.setVisible(true);
 			}catch(NumberFormatException e)
 			{
 				System.err.println(e.getMessage());
